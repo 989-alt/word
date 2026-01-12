@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>쿵쿵따! 어린이 끝말잇기</title>
+    <!-- Google Fonts: Jua for a playful, Korean educational look -->
+    <link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
+    <!-- Tailwind CSS (via CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom Styles & Animations */
+        body {
+            font-family: 'Jua', sans-serif;
+            background-color: #FFF9C4; /* Light Pastel Yellow */
+            background-image: radial-gradient(#FFECB3 2px, transparent 2px);
+            background-size: 30px 30px;
+            overflow: hidden; /* Prevent scrolling on body, scroll inside app */
+        }
+
+        .game-container {
+            max-width: 600px;
+            height: 100vh;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            background: rgba(255, 255, 255, 0.9);
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        }
+
+        @media (min-width: 600px) {
+            .game-container {
+                height: 90vh;
+                margin-top: 5vh;
+                border-radius: 20px;
+                border: 4px solid #FFCC80;
+            }
+        }
+
+        /* Chat Bubbles */
+        .bubble {
+            max-width: 80%;
+            padding: 12px 18px;
+            border-radius: 20px;
+            margin: 8px 0;
+            font-size: 1.2rem;
+            position: relative;
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            word-break: keep-all;
+        }
+
+        .bubble-player {
+            align-self: flex-end;
+            background-color: #81D4FA; /* Pastel Blue */
+            color: #01579B;
+            border-bottom-right-radius: 4px;
+        }
+
+        .bubble-ai {
+            align-self: flex-start;
+            background-color: #FFAB91; /* Pastel Orange/Pink */
+            color: #BF360C;
+            border-bottom-left-radius: 4px;
+        }
+
+        /* Animations */
+        @keyframes popIn {
+            from { transform: scale(0.5); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+
+        .shake-anim {
+            animation: shake 0.4s ease-in-out;
+        }
+
+        .timer-bar {
+            transition: width 1s linear;
+        }
+
+        /* Scrollbar Styling */
+        .chat-area::-webkit-scrollbar {
+            width: 8px;
+        }
+        .chat-area::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+        }
+        .chat-area::-webkit-scrollbar-thumb {
+            background: #FFCC80; 
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="text-gray-800">
+
+    <!-- Start Screen Overlay -->
+    <div id="start-screen" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-yellow-100 bg-opacity-95 backdrop-blur-sm transition-opacity duration-300">
+        <div class="text-6xl mb-4 animate-bounce">🎨</div>
+        <h1 class="text-5xl text-orange-500 mb-2 drop-shadow-md">쿵쿵따!</h1>
+        <h2 class="text-3xl text-blue-500 mb-8">어린이 끝말잇기</h2>
+        
+        <div class="bg-white p-6 rounded-2xl shadow-lg max-w-sm w-full mx-4 border-4 border-orange-200">
+            <h3 class="text-xl text-center mb-4 text-gray-600 border-b pb-2">📜 게임 규칙</h3>
+            <ul class="list-disc pl-6 space-y-2 text-lg text-gray-700 mb-6">
+                <li>컴퓨터와 번갈아가며 단어를 말해요.</li>
+                <li>앞 단어의 <strong>마지막 글자</strong>로 시작해야 해요.</li>
+                <li><strong>두음법칙</strong>은 자동으로 적용돼요!<br><span class="text-sm text-gray-500">(예: 리본 -> 이발소)</span></li>
+                <li><strong>10초</strong> 안에 입력해야 해요! ⏰</li>
+            </ul>
+            <button onclick="startGame()" class="w-full bg-green-400 hover:bg-green-500 text-white text-2xl py-3 rounded-xl shadow-md transform active:scale-95 transition-all">
+                게임 시작! 🎮
+            </button>
+        </div>
+    </div>
+
+    <!-- Game Over Overlay -->
+    <div id="game-over-screen" class="hidden fixed inset-0 z-50 flex flex-col items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
+        <div class="bg-white p-8 rounded-3xl shadow-2xl text-center max-w-sm w-full mx-4 animate-popIn border-4 border-red-300">
+            <div id="game-over-icon" class="text-6xl mb-4">😢</div>
+            <h2 id="game-over-title" class="text-4xl font-bold text-red-500 mb-2">게임 오버!</h2>
+            <p id="game-over-msg" class="text-xl text-gray-600 mb-6">시간이 다 되었어요.</p>
+            <div class="bg-yellow-100 p-4 rounded-xl mb-6">
+                <p class="text-lg">내 점수</p>
+                <p id="final-score" class="text-4xl font-bold text-orange-500">0점</p>
+            </div>
+            <button onclick="resetGame()" class="w-full bg-blue-400 hover:bg-blue-500 text-white text-xl py-3 rounded-xl shadow-md transform active:scale-95 transition-all">
+                다시 하기 🔄
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Game Container -->
+    <div class="game-container relative">
+        <!-- Header -->
+        <header class="bg-orange-100 p-4 flex justify-between items-center shadow-sm z-10">
+            <div class="flex items-center">
+                <span class="text-2xl mr-2">🐯</span>
+                <div>
+                    <h1 class="text-xl text-orange-600 leading-none">끝말잇기</h1>
+                    <span class="text-xs text-orange-400">vs AI 워디</span>
+                </div>
+            </div>
+            <div class="bg-white px-4 py-1 rounded-full shadow-inner border border-orange-200">
+                <span class="text-gray-500 text-sm">점수: </span>
+                <span id="score-display" class="text-xl text-orange-500 font-bold">0</span>
+            </div>
+        </header>
+
+        <!-- Timer Bar -->
+        <div class="w-full bg-gray-200 h-3">
+            <div id="timer-bar" class="bg-green-400 h-3 w-full rounded-r-full"></div>
+        </div>
+
+        <!-- Chat History Area -->
+        <div id="chat-area" class="flex-1 overflow-y-auto p-4 flex flex-col bg-white">
+            <!-- Initial Bot Message -->
+            <div class="bubble bubble-ai">안녕! 나랑 끝말잇기 하자. 내가 먼저 시작할게!</div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="p-4 bg-yellow-50 border-t border-yellow-200">
+            <!-- Current Word Display (Hint) -->
+            <div class="text-center mb-2">
+                <span class="text-gray-500 text-sm">이어질 글자: </span>
+                <span id="target-char" class="text-3xl text-blue-500 font-bold animate-pulse">?</span>
+            </div>
+
+            <form id="game-form" onsubmit="handlePlayerSubmit(event)" class="flex gap-2">
+                <input 
+                    type="text" 
+                    id="user-input" 
+                    class="flex-1 border-2 border-yellow-300 rounded-xl px-4 py-3 text-xl focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-200 transition-all shadow-sm"
+                    placeholder="단어를 입력해줘!" 
+                    autocomplete="off"
+                    maxlength="6"
+                    disabled
+                >
+                <button 
+                    type="submit" 
+                    id="submit-btn"
+                    class="bg-blue-400 hover:bg-blue-500 text-white rounded-xl px-6 text-xl shadow-md disabled:bg-gray-300 disabled:cursor-not-allowed transform active:scale-95 transition-all"
+                    disabled
+                >
+                    입력
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // --- Game Configuration & Data ---
+        const TIMER_SECONDS = 10;
+        let score = 0;
+        let history = new Set();
+        let isGameActive = false;
+        let timerInterval;
+        let timeLeft = TIMER_SECONDS;
+        let currentWord = "";
+        
+        // Dueum Beop-chik Map (Initial Sound Rule)
+        // Simplified mapping for common Hangul logic tailored for kids
+        const dueumMap = {
+            '라':'나', '락':'낙', '란':'난', '랄':'날', '람':'남', '랍':'납', '랑':'낭', 
+            '래':'내', '랭':'냉', '냑':'약', '략':'약', '냥':'양', '량':'양', 
+            '녀':'여', '려':'여', '년':'연', '련':'연', '녈':'열', '렬':'열', 
+            '념':'염', '렴':'염', '렵':'엽', '녕':'영', '령':'영', '녜':'예', '례':'예', 
+            '로':'노', '록':'녹', '론':'논', '롱':'농', '뢰':'뇌', '료':'요', '룡':'용', 
+            '루':'누', '류':'유', '륙':'육', '륜':'윤', '률':'율', '륭':'융', 
+            '르':'느', '륵':'늑', '름':'늠', '릉':'능', '리':'이', '린':'인', '림':'임', '립':'입'
+        };
+
+        // Simple AI Vocabulary (Common Korean Words for kids)
+        // Grouped by starting character to easily find responses
+        const aiVocabulary = [
+            "강아지", "고양이", "기차", "구름", "가방", "가위", "거미", "가족", "개구리",
+            "나비", "나무", "노래", "누나", "농구", "낚시", "냉장고", "놀이터", "너구리",
+            "다람쥐", "도토리", "두부", "대문", "도로", "다리", "도마뱀", "독수리",
+            "라면", "라디오", "로봇", "리본", "레몬", "루비", "로켓",
+            "마음", "미소", "무지개", "모자", "머리", "마차", "미역", "매미",
+            "바나나", "바다", "비행기", "버스", "보물", "바지", "병원", "부모님",
+            "사자", "사과", "소방차", "시계", "사랑", "수박", "사탕", "선생님",
+            "아기", "아버지", "어머니", "우산", "오리", "유리", "우유", "운동화", "여우",
+            "자전거", "자동차", "지우개", "지도", "주스", "장미", "지갑", "종이",
+            "차표", "치마", "친구", "치즈", "칠판", "책상", "초콜릿", "축구",
+            "카메라", "코끼리", "쿠키", "크리스마스", "키위", "케이크",
+            "타조", "토끼", "트럭", "토마토", "태양", "텔레비전", "택시",
+            "파도", "피자", "포도", "피아노", "풍선", "펭귄", "파리",
+            "하마", "하루", "휴지", "호랑이", "해바라기", "하늘", "학교", "할머니"
+        ];
+
+        // --- DOM Elements ---
+        const startScreen = document.getElementById('start-screen');
+        const gameOverScreen = document.getElementById('game-over-screen');
+        const chatArea = document.getElementById('chat-area');
+        const userInput = document.getElementById('user-input');
+        const submitBtn = document.getElementById('submit-btn');
+        const scoreDisplay = document.getElementById('score-display');
+        const finalScore = document.getElementById('final-score');
+        const timerBar = document.getElementById('timer-bar');
+        const targetCharDisplay = document.getElementById('target-char');
+        const gameOverTitle = document.getElementById('game-over-title');
+        const gameOverMsg = document.getElementById('game-over-msg');
+        const gameOverIcon = document.getElementById('game-over-icon');
+
+        // --- Game Logic ---
+
+        function startGame() {
+            // UI Reset
+            startScreen.classList.add('opacity-0', 'pointer-events-none');
+            setTimeout(() => startScreen.style.display = 'none', 300);
+            resetGameState();
+            
+            // Pick random start word for AI
+            const startWords = ["끝말잇기", "기차", "사과", "바나나", "하늘"];
+            const firstWord = startWords[Math.floor(Math.random() * startWords.length)];
+            
+            // AI plays first
+            addMessage(firstWord, 'ai');
+            updateCurrentWord(firstWord);
+            
+            startTurn();
+        }
+
+        function resetGame() {
+            gameOverScreen.classList.add('hidden');
+            chatArea.innerHTML = '<div class="bubble bubble-ai">안녕! 나랑 끝말잇기 하자. 내가 먼저 시작할게!</div>';
+            startGame();
+        }
+
+        function resetGameState() {
+            score = 0;
+            scoreDisplay.textContent = "0";
+            history.clear();
+            isGameActive = true;
+            userInput.value = "";
+            userInput.focus();
+        }
+
+        function updateCurrentWord(word) {
+            currentWord = word;
+            history.add(word);
+            
+            // Calculate next valid chars (Original + Dueum)
+            const lastChar = word.charAt(word.length - 1);
+            let displayChar = lastChar;
+            
+            if (dueumMap[lastChar]) {
+                displayChar = `${lastChar} (${dueumMap[lastChar]})`;
+            }
+            
+            targetCharDisplay.textContent = displayChar;
+        }
+
+        function startTurn() {
+            if (!isGameActive) return;
+            
+            // Enable Input
+            userInput.disabled = false;
+            submitBtn.disabled = false;
+            userInput.focus();
+            
+            // Reset Timer
+            timeLeft = TIMER_SECONDS;
+            updateTimerBar();
+            
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                updateTimerBar();
+                
+                if (timeLeft <= 0) {
+                    endGame("time-out");
+                }
+            }, 1000);
+        }
+
+        function updateTimerBar() {
+            const percentage = (timeLeft / TIMER_SECONDS) * 100;
+            timerBar.style.width = `${percentage}%`;
+            
+            // Color changes based on time urgency
+            if (percentage > 60) {
+                timerBar.className = "h-3 rounded-r-full transition-all duration-1000 bg-green-400";
+            } else if (percentage > 30) {
+                timerBar.className = "h-3 rounded-r-full transition-all duration-1000 bg-yellow-400";
+            } else {
+                timerBar.className = "h-3 rounded-r-full transition-all duration-1000 bg-red-500 animate-pulse";
+            }
+        }
+
+        function handlePlayerSubmit(e) {
+            e.preventDefault();
+            if (!isGameActive) return;
+
+            const word = userInput.value.trim();
+            
+            // Basic Validation
+            if (!word) return;
+            if (word.length < 2) {
+                shakeInput();
+                showToast("❌ 두 글자 이상이어야 해요!");
+                return;
+            }
+
+            // Hangul Check
+            const lastChar = currentWord.charAt(currentWord.length - 1);
+            const firstChar = word.charAt(0);
+            
+            let isValidStart = false;
+            
+            // Check exact match
+            if (firstChar === lastChar) isValidStart = true;
+            
+            // Check Dueum Beop-chik
+            if (dueumMap[lastChar] && firstChar === dueumMap[lastChar]) isValidStart = true;
+
+            if (!isValidStart) {
+                shakeInput();
+                showToast(`❌ '${targetCharDisplay.textContent}'(으)로 시작해야 해요!`);
+                return;
+            }
+
+            // Check Duplicate
+            if (history.has(word)) {
+                shakeInput();
+                showToast("❌ 이미 나온 단어예요!");
+                return;
+            }
+
+            // Pseudo-dictionary check (Relaxed for kids)
+            // In a real app, use an API. Here we just ensure it's valid Hangul.
+            const hangulRegex = /^[가-힣]+$/;
+            if (!hangulRegex.test(word)) {
+                shakeInput();
+                showToast("❌ 한글만 입력해주세요!");
+                return;
+            }
+
+            // SUCCESS!
+            clearInterval(timerInterval);
+            addMessage(word, 'player');
+            updateCurrentWord(word);
+            score += 10;
+            scoreDisplay.textContent = score;
+            userInput.value = "";
+            userInput.disabled = true;
+            submitBtn.disabled = true;
+
+            // Trigger AI Turn
+            setTimeout(aiTurn, 1000 + Math.random() * 1000); // Random delay 1-2s
+        }
+
+        function aiTurn() {
+            if (!isGameActive) return;
+
+            const lastChar = currentWord.charAt(currentWord.length - 1);
+            const dueumChar = dueumMap[lastChar];
+
+            // Filter vocabulary for valid words
+            const candidates = aiVocabulary.filter(word => {
+                const first = word.charAt(0);
+                const matchesStart = (first === lastChar) || (dueumChar && first === dueumChar);
+                const notUsed = !history.has(word);
+                const lenCheck = word.length >= 2;
+                return matchesStart && notUsed && lenCheck;
+            });
+
+            if (candidates.length > 0) {
+                // AI found a word
+                const choice = candidates[Math.floor(Math.random() * candidates.length)];
+                addMessage(choice, 'ai');
+                updateCurrentWord(choice);
+                startTurn(); // Back to player
+            } else {
+                // AI lost
+                endGame("ai-giveup");
+            }
+        }
+
+        // --- Helpers ---
+
+        function addMessage(text, type) {
+            const div = document.createElement('div');
+            div.className = `bubble bubble-${type}`;
+            div.textContent = text;
+            chatArea.appendChild(div);
+            
+            // Auto scroll to bottom
+            chatArea.scrollTop = chatArea.scrollHeight;
+        }
+
+        function shakeInput() {
+            userInput.classList.add('shake-anim');
+            userInput.classList.add('border-red-400');
+            setTimeout(() => {
+                userInput.classList.remove('shake-anim');
+                userInput.classList.remove('border-red-400');
+            }, 400);
+        }
+
+        function showToast(msg) {
+            // Simple toast logic, usually we would append a div
+            // For simplicity, using placeholder text in the input briefly or just relying on shake
+            // Let's change the placeholder temporarily
+            const originalPlace = userInput.placeholder;
+            userInput.value = "";
+            userInput.placeholder = msg;
+            userInput.classList.add('placeholder-red-400');
+            setTimeout(() => {
+                userInput.placeholder = "단어를 입력해줘!";
+                userInput.classList.remove('placeholder-red-400');
+            }, 1500);
+        }
+
+        function endGame(reason) {
+            isGameActive = false;
+            clearInterval(timerInterval);
+            finalScore.textContent = score + "점";
+            
+            if (reason === "time-out") {
+                gameOverTitle.textContent = "시간 초과!";
+                gameOverMsg.textContent = "아쉽네요! 다음엔 더 빠르게!";
+                gameOverIcon.textContent = "⏰";
+            } else if (reason === "ai-giveup") {
+                gameOverTitle.textContent = "승리! 🎉";
+                gameOverMsg.textContent = "우와! 컴퓨터가 단어를 못 찾았어요!";
+                gameOverIcon.textContent = "🏆";
+                gameOverTitle.classList.replace('text-red-500', 'text-green-500');
+            }
+
+            gameOverScreen.classList.remove('hidden');
+        }
+
+        // --- Init ---
+        // Prevent accidental form submission on enter if button disabled
+        userInput.addEventListener('keypress', function (e) {
+            if (e.key === 'Enter' && userInput.disabled) {
+                e.preventDefault();
+            }
+        });
+
+    </script>
+</body>
+</html>
